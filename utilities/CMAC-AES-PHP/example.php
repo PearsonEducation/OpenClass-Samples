@@ -1,4 +1,4 @@
-<?php 
+<?php
 
 /** 
  * Using PHPCryptLib to Create CMAC-AES Hashes
@@ -45,16 +45,27 @@ require_once 'lib/CryptLib/bootstrap.php';
 $eCMAC = new CryptLib\MAC\Implementation\ECollegeCMAC; 
 
 //Define your partner-specific secret key somewhere in your code. 
-$your_secret_key = 'keep.it.secret.keep.it.safe';
+$your_secret_key = '';
 
-//Set up variables for the request
-$api_url = "https://m-api.ecollege.com/token";
-$grantType = "assertion";
-$assertionType = "<type>"; //either urn:ecollege:names:moauth:1.0:assertion 
-							//    or urn:ecollege:names:sourcedid:1.0:assertion
+//Set up variables for creating the assertion
+$client_name   = "";
+$key_moniker   = "";
+$client_id 	   = "";
+$client_string = "";
+$username 	   = "";
+$timestamp 	   = date('c'); 
+
+//Set up variables needed to make the request of the API 
+$api_url       = "https://m-api.ecollege.com/token";
+$grantType 	   = "assertion";
+$assertionType = "urn:ecollege:names:moauth:1.0:assertion"; //either urn:ecollege:names:moauth:1.0:assertion  -- if using a username
+															//    or urn:ecollege:names:sourcedid:1.0:assertion -- if using a sourced id
+
 
 //Assemble the Assertion string following this pattern (see documentation for details)
-$assertion = '{client_name}|{key_moniker}|{client_id}|{client_string}|{username}|{timestamp}';
+//$assertion = '{client_name}|{key_moniker}|{client_id}|{client_string}|{username}|{timestamp}';
+$assertion = "$client_name|$key_moniker|$client_id|$client_string|$username|$timestamp";
+
 
 try{
 
@@ -72,40 +83,64 @@ try{
 //Append the signature hash to the Assertion 
 $assertion .= '|'.$cmac; 
 
-
 // 
 // You now have a signed assertion string. To get an access token, use 
 // code similar to the following. 
 // 
 
-//Create a request to the API 
-$request = new HttpRequest($api_url, HttpRequest::METH_POST);        
-$request->setContentType("application/x-www-form-urlencoded");
-$request->addPostFields(array("grant_type" => $grantType,
-                              "assertion_type" => $assertionType,
-                              "assertion" => $assertion)); 
-try{
+//Set up the body of the POST request
+$post_fields = "grant_type=".$grantType."&assertion_type=".$assertionType."&assertion=".$assertion;  
+
+
+//Set up cURL Transaction
+$ch = curl_init();
+curl_setopt($ch, CURLOPT_URL, $api_url);
+curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+curl_setopt($ch, CURLOPT_CUSTOMREQUEST, "POST");
+curl_setopt($ch, CURLOPT_POSTFIELDS, $post_fields);
+
+
+//NOTE: 
+// If you experience problems related to an SSL Cert, uncomment the next two lines. 
+// You'll know there's a problem if the error message comes from the $curlError variable below
+// and says something about SSL. You shouldn't have to do this, but if you do, send us the complete
+// error message that inspired you to make this change and let us know it happened, and we'll look
+// into any SSL cert issues. 
+
+// curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, 0);
+// curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, 0);
+
+
+//execute & get server response;
+$api_response = curl_exec($ch); 
+
+//capture errors or other status codes
+$curl_error = curl_error($ch);
+$http_code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+
+
+// problem with the transport layer (i.e. SSL problems) 
+if($curl_error){
+
+	echo "There was a problem making the API Call. cURL problem: $curlError"; 
 	
-	// Send Request & Get Response
-	$request->send();
 
-	if ($request->getResponseCode() == 200) {
-
-	    // Get the Json reponse containing the Access Token
-	    $json = $request->getResponseBody();
-
-	    // Parse the Json response and retrieve the Access Token
-	    $ser = json_decode($json);
-	    $accessToken = $ser->access_token;
-	    echo ("Access Token = ".$accessToken);
+//porblem with the service / host layer (i.e. Error 400) 
+} else if(intval($http_code / 100) >=4){
 	
-	} else {
-	    // The server returned an error; display the error message
-	    echo ("The server returned '".$request->getResponseBody()."'".
-	            " with the status code '".$request->getResponseCode()."'");
-	}
-} catch(Exception $e){ 
-	exit($e->getMessage()); 
-} 
+	$decoded_response = json_decode($api_response); 
+	$msg = (is_object($decoded_response) && isset($decoded_response->error->message))?$decoded_response->error->message:"No message reported."; 
+	echo "The API Server responded with ".$http_code.". Message was: $msg";
 
-?>
+
+// success!
+} else {
+
+	$decoded_response = json_decode($api_response); 
+	$access_token = $decoded_response->access_token; 
+	$expires_in = $decoded_response->expires_in; // seconds 
+
+	echo "<b>Access Token:</b> $access_token<br /><br />"; 
+	echo "<b>Expires In:</b> $expires_in<br /><br />"; 
+	
+}
