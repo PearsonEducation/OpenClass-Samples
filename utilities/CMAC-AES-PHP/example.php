@@ -53,7 +53,7 @@ $key_moniker   = "";
 $client_id 	   = "";
 $client_string = "";
 $username 	   = "";
-$timestamp 	   = date('c'); 
+$timestamp 	   = str_replace('+00:00','Z',gmdate('c')); 
 
 //Set up variables needed to make the request of the API 
 $api_url       = "https://m-api.ecollege.com/token";
