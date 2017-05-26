@@ -1,0 +1,390 @@
+swagger: "2.0"
+info:
+  version: 1.0.0
+  title: De-Identification Service
+  description: |
+              A simple API that takes in a real userdid and additional context 
+              information and returns an Id that is tied to the user and context.
+              This allows the service to abstract the real user id in downstream systems.  
+              The benefit of doing this is 
+              * easy to perform data deletion
+              * solves a number of data privacy related issues 
+              * allows data to be transmitted outside of country boundaries 
+              
+              De-identified data may be shared without the consent required by FERPA (34 CFR §99.30) with any
+              party for any purpose, including parents, general public, and researchers (34 CFR §99.31(b)(1)). 
+  termsOfService: http://swagger.io/terms/
+  contact:
+    name: De-Identification service API specification
+    email: Chadwick.reimers@Pearson.com
+    url: http://pearsoned.com
+  license:
+    name: MIT
+    url: http://github.com/gruntjs/grunt/blob/master/LICENSE-MIT
+host: DeIdent.pearsoned.com
+securityDefinitions:
+  oauth2:
+    description: All routes in this API require and Oauth JWT token from PI 
+    type: apiKey
+    name: X-Authorization
+    in: header
+basePath: /v1/privacy
+schemes:
+  - http
+  - https
+consumes:
+  - application/json
+produces:
+  - application/json
+paths:
+  /deidentifications:
+    get:
+      description: |
+        Returns the full list (might not be implemented)
+      operationId: get deidentification
+      parameters:
+        - name: X-Authoization
+          in: header
+          description: the authentication header that must be sent with every request
+          required: true
+          type: string
+        - name: offset
+          in: query
+          description: where to start the next page
+          required: false
+          type: string
+        - name: limit
+          in: query
+          description: maximum number of results to return
+          required: false
+          type: integer
+          format: int32
+      responses:
+        200:
+          description: De-Identification response
+          schema:
+            type: array
+            items:
+              $ref: '#/definitions/AnonRecord'
+        default:
+          description: unexpected error
+          schema:
+            $ref: '#/definitions/Error'
+    post:
+      description: |
+        Creates a new anonymous ID for the given user and context. 
+        De-identification minimizes the risk of unintended disclosure
+        of the identity of individuals and information about them via
+        record data.  Re-identification is possible by a trusted party.
+      operationId: create ID
+      parameters:
+        - name: X-Authoization
+          in: header
+          description: the authentication header that must be sent with every request
+          required: true
+          type: string
+        - name: body
+          in: body
+          description: The data to generate an anonymous id for 
+          required: true
+          schema:
+            $ref: '#/definitions/NewAnonRecord'
+      responses:
+        '201':
+          description: De-Identification response
+          schema:
+            $ref: '#/definitions/NewAnon'
+        '409':
+          description: Conflict
+          schema:
+            $ref: '#/definitions/Error'
+        default:
+          description: unexpected error
+          schema:
+            $ref: '#/definitions/Error'
+            
+  /deidentification/{system}/users/{userId}:
+    get:
+      description: Return all the records for a given userId 
+      operationId: Get by UserId
+      parameters:
+        - name: X-Authoization
+          in: header
+          description: the authentication header that must be sent with every request
+          required: true
+          type: string
+        - name: system
+          in: path
+          description: the system sending the request
+          required: true
+          type: string
+        - name: userId
+          in: path
+          description: the user Id sending the request
+          required: true
+          type: string
+      responses:
+        200:
+          description: De-Identification response
+          schema:
+            type: array
+            items:
+              $ref: '#/definitions/AnonRecord'
+        default:
+          description: unexpected error
+          schema:
+            $ref: '#/definitions/Error'
+  /deidentification/search?parameter1=value1&parameter2=value2:
+    get:
+      description: Allows for more complex queries against the data set.  For example you could request all the de-identified Id's for a given course or system.
+      operationId: Searchs
+      parameters:
+        - name: X-Authoization
+          in: header
+          description: the authentication header that must be sent with every request
+          required: true
+          type: string
+        - name: parameter1
+          in: query
+          description: the system sending the request
+          required: true
+          type: string
+        - name: value1
+          in: query
+          description: the system sending the request
+          required: true
+          type: string
+        - name: parameter2
+          in: query
+          description: the system sending the request
+          required: true
+          type: string
+        - name: value2
+          in: query
+          description: the system sending the request
+          required: true
+          type: string
+      responses:
+        200:
+          description: De-Identification response
+          schema:
+            type: array
+            items:
+              $ref: '#/definitions/AnonRecord'
+        default:
+          description: unexpected error
+          schema:
+            $ref: '#/definitions/Error'
+      
+  /deidentification/{system}/users/{userId}/{contextType}/{contextId}:
+    get:
+      description: 
+        Returns a user based on a single ID, if the user does not have
+        access return 404
+      operationId: GetbyContextidandUser
+      parameters:
+        - name: X-Authoization
+          in: header
+          description: the authentication header that must be sent with every request
+          required: true
+          type: string
+        - name: system
+          in: path
+          description: the system sending the request
+          required: true
+          type: string
+        - name: userId
+          in: path
+          description: the user Id sending the request
+          required: true
+          type: string
+        - name: contextType
+          in: path
+          description: the type of context type of the forthcomming ID,  Examples include Course, Organization
+          required: true
+          type: string
+        - name: contextId
+          in: path
+          description: the anonymous id created by this service
+          required: true
+          type: string
+      responses:
+        200:
+          description: De-Identification response
+          schema:
+            $ref: '#/definitions/AnonRecord'
+        default:
+          description: unexpected error
+          schema:
+            $ref: '#/definitions/Error'
+    delete:
+      description: |
+        Deletes a specific record within a context.  This will remove a record rendering all
+        mapped records being anonymized.  This is a perminate operation.  As part of this operation
+        the routes should send information to the data deletion service
+      operationId: Delete One
+      parameters:
+        - name: X-Authoization
+          in: header
+          description: the authentication header that must be sent with every request
+          required: true
+          type: string
+        - name: system
+          in: path
+          description: the system sending the request
+          required: true
+          type: string
+        - name: userId
+          in: path
+          description: the user Id sending the request
+          required: true
+          type: string
+        - name: contextType
+          in: path
+          description: the type of context type of the forthcomming ID,  Examples include Course, Organization
+          required: true
+          type: string
+        - name: contextId
+          in: path
+          description: the anonymous id created by this service
+          required: true
+          type: string
+      responses:
+        204:
+          description: deleted
+          schema:
+            $ref: '#/definitions/deleted'
+        default:
+          description: unexpected error
+          schema:
+            $ref: '#/definitions/Error'
+
+  /deidentification/{id}:
+    get:
+      description: 
+        Returns a record given the anonymousId.  This route is secured and
+        only available to authorized users.
+      operationId: getbyAnonId
+      parameters:
+        - name: X-Authoization
+          in: header
+          description: the authentication header that must be sent with every request
+          required: true
+          type: string
+        - name: id
+          in: path
+          description: ID of pet to delete
+          required: true
+          type: integer
+          format: int64
+      responses:
+        200:
+          description: found
+          schema:
+            type: array
+            items:
+              $ref: '#/definitions/AnonRecord'
+        default:
+          description: unexpected error
+          schema:
+            $ref: '#/definitions/Error'    
+    delete:
+      description: |
+        Deletes all of the mappings for a given user. This will remove all of the users records rendering all
+        mapped records being anonymized.  This is a perminate operation.  As part of this operation
+        the routes should send information to the data deletion service
+      operationId: deleteMappings
+      parameters:
+        - name: X-Authoization
+          in: header
+          description: the authentication header that must be sent with every request
+          required: true
+          type: string
+        - name: id
+          in: path
+          description: ID of pet to delete
+          required: true
+          type: integer
+          format: int64
+      responses:
+        204:
+          description: deleted
+          schema:
+            type: array
+            items:
+              $ref: '#/definitions/deleted'
+        default:
+          description: unexpected error
+          schema:
+            $ref: '#/definitions/Error'
+definitions:
+  NewAnonRecord:
+    type: object
+    properties:
+        userId:
+          type: string
+        collaboratingSystem:
+          type: string
+        originatingSystem:
+          type: string
+        contextType:
+          type: string
+        contextId:
+          type: string
+    required:
+      - userId
+      - collaboratingSystem
+      - originatingSystem
+  AnonRecord: 
+    type: object
+    properties:
+        anonymousId:
+          type: string
+        userId:
+          type: string
+        collaboratingSystem:
+          type: string
+        originatingSystem:
+          type: string
+        contextType:
+          type: string
+        contextId:
+          type: string
+    required:
+      - anonymousId
+      - userId
+      - collaboratingSystem
+      - originatingSystem
+  NewAnon:
+    type: object
+    properties:
+      anonymousId:
+        type: string
+        example: 
+          anonymousId: "e34a91e4-2491-439f-984a-84663415d7ae"
+    required:
+      - anonymousId
+  deleted: 
+    type: object
+    properties:
+      anonymousId:
+        type: string
+        example: 
+          userId: "e34a91e4-2491-439f-984a-84663415d7ae"
+      status:
+        type: string
+        example:
+          status: "deleted"
+    required:
+      - anonymousId
+      - status
+  Error:
+    required:
+      - code
+      - message
+    properties:
+      code:
+        type: integer
+        format: int32
+      message:
+        type: string
