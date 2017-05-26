@@ -1,6 +1,5 @@
-Pearson Developers Network has Moved
+Pearson Developers Network Swagger 
 ====================================
 
-Please note that sample code, libraries, and sample applications from the Pearson Developers Network has moved to the "PearsonDevelopersNetwork" organization on GitHub: 
 
-https://github.com/PearsonDevelopersNetwork
+
